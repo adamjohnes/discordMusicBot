@@ -21,7 +21,7 @@ ffmpeg_options = {"options": "-vn"}
 
 def run_discord_bot():
 	
-	TOKEN = "MTAyOTI0OTM5NDIyODM1MDk4Ng.Ge7jSK.UGjXS6sMq5B4urN1mQRZAlF2DDKogMuecfQRnE"
+	TOKEN = "MTAyOTI0OTM5NDIyODM1MDk4Ng.GLZW18.vd5ZC0K7clfRxizldRR7d9_cQOhWJ3jsQQM5hA"
 	bot = commands.Bot(intents=discord.Intents.all(), command_prefix = '<')
 	@bot.event
 	async def on_ready():
@@ -186,68 +186,67 @@ def run_discord_bot():
 		except discord.errors.ClientException:
 			pass
 
-		if request != "next":
-			vidID, title = str(), str()
-			url = request
-			if "watch?" in request:
-				vidID = request[request.index("="):]
-				vidID = vidID[1::]
-			elif "tu.be" in request:
-				vidID = request[request.index("."):]
-				vidID = vidID[4::]
-			params = {"format": "json", "url": "https://www.youtube.com/watch?v=%s" % vidID}
-			request = "https://www.youtube.com/oembed"
-			query_str = urllib.parse.urlencode(params)
-			request = request + "?" + query_str
+		vidID, title = str(), str()
+		url = request
+		if "watch?" in request:
+			vidID = request[request.index("="):]
+			vidID = vidID[1::]
+		elif "tu.be" in request:
+			vidID = request[request.index("."):]
+			vidID = vidID[4::]
+		params = {"format": "json", "url": "https://www.youtube.com/watch?v=%s" % vidID}
+		request = "https://www.youtube.com/oembed"
+		query_str = urllib.parse.urlencode(params)
+		request = request + "?" + query_str
 
-			try:
-				with urllib.request.urlopen(request) as response:
-				    response_text = response.read()
-				    data = json.loads(response_text.decode())
-				    title = data['title']
-			except urllib.error.HTTPError:
-				await ctx.send("Please use a youtube URL. (more play options possibly coming in the future)")
-			song = URL(title, url)
-			config.songs.addToQueue(song)
+		try:
+			with urllib.request.urlopen(request) as response:
+			    response_text = response.read()
+			    data = json.loads(response_text.decode())
+			    title = data['title']
+		except urllib.error.HTTPError:
+			await ctx.send("Please use a youtube URL. (more play options possibly coming in the future)")
+		song = URL(title, url)
+		config.songs.addToQueue(song)
 
-			if voice_clients[ctx.guild.id].is_playing():
-				return
+		if voice_clients[ctx.guild.id].is_playing():
+			return
+		loop = asyncio.get_event_loop()
+		urlData = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download = False))
+		toPlay = urlData['url']
+		player = discord.FFmpegPCMAudio(toPlay, **ffmpeg_options, executable = "bin\\ffmpeg.exe")
+		if len(config.songs.queue) == 0:
+			await ctx.send("The queue is now empty!")
+
+		try:
+			voice_clients[ctx.guild.id].play(player)
+			config.songs.current = config.songs.queue[0]
+			config.songs.removeFromQueue()
+			await isPlayingMusic(ctx)
+		except discord.errors.ClientException:
+			pass
+			
+		if len(config.songs.queue) == 0:
+			await ctx.send("The queue is empty!")
+			return
+		else:
+			if (check_is_playing_method == False):
+				await isPlayingMusic(ctx)
+			url = config.songs.queue[0].url
 			loop = asyncio.get_event_loop()
 			urlData = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download = False))
 			toPlay = urlData['url']
 			player = discord.FFmpegPCMAudio(toPlay, **ffmpeg_options, executable = "bin\\ffmpeg.exe")
 			if len(config.songs.queue) == 0:
 				await ctx.send("The queue is now empty!")
-
-			try:
-				voice_clients[ctx.guild.id].play(player)
-				config.songs.current = config.songs.queue[0]
-				config.songs.removeFromQueue()
-				await isPlayingMusic(ctx)
-			except discord.errors.ClientException:
-				pass
-		else:
-			if len(config.songs.queue) == 0:
-				await ctx.send("The queue is empty!")
-				return
-			else:
-				if (check_is_playing_method == False):
-					await isPlayingMusic(ctx)
-				url = config.songs.queue[0].url
-				loop = asyncio.get_event_loop()
-				urlData = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download = False))
-				toPlay = urlData['url']
-				player = discord.FFmpegPCMAudio(toPlay, **ffmpeg_options, executable = "bin\\ffmpeg.exe")
-				if len(config.songs.queue) == 0:
-					await ctx.send("The queue is now empty!")
-				if voice_clients[ctx.guild.id].is_playing() == False:
-					try:
-						voice_clients[ctx.guild.id].play(player)
-						config.songs.current = config.songs.queue[0]
-						config.songs.removeFromQueue()
-					except discord.errors.ClientException:
-						add_song(ctx, url)
-						await ctx.send("Added " + song + " to the queue.")
+			if voice_clients[ctx.guild.id].is_playing() == False:
+				try:
+					voice_clients[ctx.guild.id].play(player)
+					config.songs.current = config.songs.queue[0]
+					config.songs.removeFromQueue()
+				except discord.errors.ClientException:
+					add_song(ctx, url)
+					await ctx.send("Added " + song + " to the queue.")
 
 	@bot.command(name = "pause", help = "Pauses the song that is currently playing")
 	async def pause_song(ctx):
